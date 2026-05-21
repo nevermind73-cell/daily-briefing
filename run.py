@@ -12,9 +12,6 @@ CFG = {
     "openweathermap_key": os.environ["OPENWEATHERMAP_KEY"],
     "newsapi_key":        os.environ["NEWSAPI_KEY"],
     "alphavantage_key":   os.environ["ALPHAVANTAGE_KEY"],
-    "pushover_user_key":  os.environ["PUSHOVER_USER_KEY"],
-    "pushover_app_token": os.environ["PUSHOVER_APP_TOKEN"],
-    "pages_url":          os.environ.get("PAGES_URL", ""),
     "gmail_user":         os.environ.get("GMAIL_USER", ""),
     "gmail_password":     os.environ.get("GMAIL_APP_PASSWORD", ""),
     "email_to":           os.environ.get("EMAIL_TO", ""),
@@ -117,22 +114,26 @@ def fetch_arxiv():
 # ── 경쟁사 ────────────────────────────────────────────────────────────────────
 
 def fetch_competitors():
-    short = {"GE Healthcare":"GE", "Siemens Healthineers":"Siemens",
-             "Philips Healthcare":"Philips", "Ziehm Imaging":"Ziehm",
-             "Hologic":"Hologic"}
+    companies = {
+        "GE Healthcare":       "GE",
+        "Siemens Healthineers":"Siemens",
+        "Philips Healthcare":  "Philips",
+        "Ziehm Imaging":       "Ziehm",
+        "Hologic":             "Hologic",
+    }
     results = {}
-    for co, label in short.items():
+    for co, label in companies.items():
         try:
-            root = ET.fromstring(
-                get(f"https://news.google.com/rss/search?q={quote(co)}&hl=en-US&gl=US&ceid=US:en",
-                    headers={"User-Agent": "Mozilla/5.0"}))
+            # Bing News RSS — 실제 기사 URL 반환
+            url = f"https://www.bing.com/news/search?q={quote(co)}&format=rss"
+            root = ET.fromstring(get(url, headers={"User-Agent": "Mozilla/5.0"}))
             ch = root.find("channel")
             items = ch.findall("item") if ch is not None else root.findall("item")
             news = []
             for item in items[:2]:
-                t = re.sub(r"\s+-\s+\S.*$", "", (item.findtext("title") or "").strip())
-                u = (item.findtext("guid") or item.findtext("link") or "").strip()
-                if t:
+                t = (item.findtext("title") or "").strip()
+                u = (item.findtext("link") or "").strip()
+                if t and u:
                     news.append({"title": t, "url": u})
             results[label] = news
         except:
@@ -261,27 +262,6 @@ a:hover{{text-decoration:underline}}
 </body>
 </html>"""
 
-# ── Pushover ──────────────────────────────────────────────────────────────────
-
-def send_pushover(summary, pages_url):
-    payload = {
-        "token":   CFG["pushover_app_token"],
-        "user":    CFG["pushover_user_key"],
-        "title":   "📋 Daily Briefing",
-        "message": summary,
-        "html":    "1",
-        "priority": 0,
-    }
-    if pages_url:
-        payload["url"] = pages_url
-        payload["url_title"] = "전체 브리핑 보기"
-
-    data = urlencode(payload).encode()
-    req = Request("https://api.pushover.net/1/messages.json", data=data,
-                  headers={"Content-Type": "application/x-www-form-urlencoded"})
-    with urlopen(req, context=_SSL, timeout=15) as r:
-        return json.loads(r.read())
-
 # ── 이메일 발송 ───────────────────────────────────────────────────────────────
 
 def send_email(subject, html_body):
@@ -341,33 +321,7 @@ def main():
         f.write(html)
     print("[7] index.html 저장 완료")
 
-    # Pushover 요약 (1024자 이내)
-    today = datetime.date.today().strftime("%Y년 %m월 %d일")
-    lines = [f"<b>{today}</b>"]
-
-    if "error" not in weather:
-        lines.append(f"🌤 {weather['temp']}°C {weather['cond']}")
-    if market:
-        parts = []
-        if "nasdaq" in market: parts.append(f"나스닥 {market['nasdaq']['price']:,.0f}")
-        if "usd_krw" in market: parts.append(f"USD/KRW {market['usd_krw']:,.0f}")
-        lines.append("📈 " + " | ".join(parts))
-
-    lines.append(f"\n📰 한국 뉴스 {len(kr_news)}건")
-    for a in kr_news[:3]:
-        t = a["title"][:50] + "…" if len(a["title"]) > 50 else a["title"]
-        lines.append(f"• {t}")
-
-    lines.append(f"\n🤖 AI {len(ai_news)}건 · arXiv {len(arxiv)}건")
-    lines.append(f"🏢 경쟁사 {sum(len(v) for v in competitors.values())}건")
-    lines.append(f"🏥 FDA {len(fda)}건")
-
-    summary = "\n".join(lines)
-    print(f"[8] Pushover 발송 ({len(summary)}자)...")
-    result = send_pushover(summary, CFG["pages_url"])
-    print(f" → {result}")
-
-    print("[9] 이메일 발송...")
+    print("[8] 이메일 발송...")
     today_str = datetime.date.today().strftime("%Y년 %m월 %d일")
     send_email(f"📋 Daily Briefing {today_str}", html)
 
