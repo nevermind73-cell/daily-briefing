@@ -93,6 +93,26 @@ def fetch_news(query=None, country=None, n=5):
     except:
         return []
 
+# ── GitHub Trending ───────────────────────────────────────────────────────────
+
+def fetch_github_trending():
+    try:
+        week_ago = (datetime.date.today() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+        url = (f"https://api.github.com/search/repositories"
+               f"?q=created:>{week_ago}&sort=stars&order=desc&per_page=5")
+        data = getj(url)
+        results = []
+        for repo in data.get("items", [])[:5]:
+            name  = repo["full_name"]
+            desc  = (repo.get("description") or "")[:60]
+            stars = repo.get("stargazers_count", 0)
+            link  = repo["html_url"]
+            title = f"⭐{stars:,} {name}" + (f" — {desc}" if desc else "")
+            results.append({"title": title, "url": link})
+        return results
+    except:
+        return []
+
 # ── arXiv ─────────────────────────────────────────────────────────────────────
 
 def fetch_arxiv():
@@ -110,6 +130,22 @@ def fetch_arxiv():
         return results
     except:
         return []
+
+# ── 번역 ──────────────────────────────────────────────────────────────────────
+
+def _is_korean(text):
+    ko = sum(1 for c in text if '가' <= c <= '힣')
+    return ko / max(len(text), 1) > 0.1
+
+def translate_ko(text):
+    if _is_korean(text):
+        return text
+    try:
+        url = f"https://api.mymemory.translated.net/get?q={quote(text)}&langpair=en|ko"
+        d = getj(url)
+        return d["responseData"]["translatedText"] or text
+    except:
+        return text
 
 # ── 경쟁사 ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +172,7 @@ def fetch_competitors():
                 qs = parse_qs(urlparse(raw_u).query)
                 u = qs.get("url", [raw_u])[0]
                 if t and u:
-                    news.append({"title": t, "url": u})
+                    news.append({"title": translate_ko(t), "url": u})
             results[label] = news
         except:
             results[label] = []
@@ -163,7 +199,7 @@ def fetch_fda():
 
 # ── HTML 생성 ─────────────────────────────────────────────────────────────────
 
-def build_html(weather, market, kr_news, ai_news, arxiv, competitors, fda):
+def build_html(weather, market, kr_news, ai_news, arxiv, github_trending, competitors, fda):
     today = datetime.date.today().strftime("%Y년 %m월 %d일")
     now = datetime.datetime.now().strftime("%H:%M")
 
@@ -258,6 +294,7 @@ a:hover{{text-decoration:underline}}
 {section("📰","한국 뉴스",news_list(kr_news))}
 {section("🤖","AI 뉴스",news_list(ai_news))}
 {section("🔬","arXiv · eess.IV",ax_html)}
+{section("🐙","GitHub 인기 프로젝트",news_list(github_trending))}
 {section("🏢","경쟁사 동향",comp_html)}
 {section("🏥","FDA 510k",fda_html)}
 </main>
@@ -309,21 +346,25 @@ def main():
     arxiv = fetch_arxiv()
     print(f" → AI {len(ai_news)}건, arXiv {len(arxiv)}건")
 
-    print("[5] 경쟁사...")
+    print("[5] GitHub Trending...")
+    github_trending = fetch_github_trending()
+    print(f" → {len(github_trending)}건")
+
+    print("[6] 경쟁사...")
     competitors = fetch_competitors()
     print(f" → {sum(len(v) for v in competitors.values())}건")
 
-    print("[6] FDA...")
+    print("[7] FDA...")
     fda = fetch_fda()
     print(f" → {len(fda)}건")
 
     # HTML 저장
-    html = build_html(weather, market, kr_news, ai_news, arxiv, competitors, fda)
+    html = build_html(weather, market, kr_news, ai_news, arxiv, github_trending, competitors, fda)
     with open("index.html", "w", encoding="utf-8") as f:
         f.write(html)
-    print("[7] index.html 저장 완료")
+    print("[8] index.html 저장 완료")
 
-    print("[8] 이메일 발송...")
+    print("[9] 이메일 발송...")
     today_str = datetime.date.today().strftime("%Y년 %m월 %d일")
     send_email(f"📋 Daily Briefing {today_str}", html)
 
