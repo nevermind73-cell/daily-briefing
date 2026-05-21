@@ -71,16 +71,15 @@ def fetch_market():
 def fetch_news(query=None, country=None, n=5):
     try:
         key = CFG["newsapi_key"]
-        today = datetime.date.today().isoformat()
         if country:
-            params = urlencode({"country": country, "pageSize": n,
-                                "apiKey": key, "from": today})
+            params = urlencode({"country": country, "pageSize": n, "apiKey": key})
             url = f"https://newsapi.org/v2/top-headlines?{params}"
         else:
             params = urlencode({"q": query, "pageSize": n,
                                 "sortBy": "publishedAt", "apiKey": key})
             url = f"https://newsapi.org/v2/everything?{params}"
-        return [a.get("title", "") for a in getj(url).get("articles", [])[:n]]
+        return [{"title": a.get("title", ""), "url": a.get("url", "")}
+                for a in getj(url).get("articles", [])[:n]]
     except:
         return []
 
@@ -92,11 +91,13 @@ def fetch_arxiv():
             get("https://arxiv.org/rss/eess.IV",
                 headers={"User-Agent": "Mozilla/5.0"})
         )
-        return [
-            re.sub(r"\s+", " ", (i.findtext("title") or "").strip())
-            for i in (root.find("channel") or root).findall("item")[:3]
-            if i.findtext("title")
-        ]
+        results = []
+        for i in (root.find("channel") or root).findall("item")[:3]:
+            t = re.sub(r"\s+", " ", (i.findtext("title") or "").strip())
+            l = (i.findtext("link") or i.findtext("guid") or "").strip()
+            if t:
+                results.append({"title": t, "url": l})
+        return results
     except:
         return []
 
@@ -118,9 +119,13 @@ def fetch_competitors():
             if items:
                 t = re.sub(r"\s+-\s+\S.*$", "",
                            (items[0].findtext("title") or "").strip())
+                u = (items[0].findtext("guid") or
+                     items[0].findtext("link") or "").strip()
                 if t:
-                    lines.append(f"• {label}: {t[:60]}…"
-                                 if len(t) > 60 else f"• {label}: {t}")
+                    display = (t[:55] + "…") if len(t) > 55 else t
+                    entry = (f"• {label}: <a href=\"{u}\">{display}</a>"
+                             if u else f"• {label}: {display}")
+                    lines.append(entry)
         except:
             pass
     return lines
@@ -138,8 +143,13 @@ def fetch_fda():
             f"+AND+decision_date:[{d7}+TO+{td}]"
             f"&limit=5&sort=decision_date:desc"
         )
-        return [f"• {r.get('k_number','')} {r.get('device_name','')[:50]}"
-                for r in data.get("results", [])[:3]]
+        items = []
+        for r in data.get("results", [])[:3]:
+            k = r.get("k_number", "")
+            name = r.get("device_name", "")[:50]
+            fda_url = f"https://www.accessdata.fda.gov/scripts/cdrh/cfdocs/cfpmn/pmn.cfm?ID={k}"
+            items.append(f"• <a href=\"{fda_url}\">{k} {name}</a>")
+        return items
     except HTTPError as e:
         return ["• 최근 7일 신규 허가 없음"] if e.code == 404 else [f"• 오류: {e}"]
     except Exception as e:
@@ -177,11 +187,17 @@ def main():
     L.append(f"📈 <b>시장</b> {fetch_market()}")
     L.append("")
 
+    def linked(title, url, prefix=""):
+        t = (title[:65] + "…") if len(title) > 65 else title
+        if url:
+            return f"• {prefix}<a href=\"{url}\">{t}</a>"
+        return f"• {prefix}{t}"
+
     print("한국 뉴스 수집 중...")
     kr = fetch_news(country="kr", n=5)
     L.append("📰 <b>한국 뉴스</b>")
-    for t in kr:
-        L.append(f"• {t[:65]}…" if len(t) > 65 else f"• {t}")
+    for a in kr:
+        L.append(linked(a["title"], a["url"]))
     if not kr:
         L.append("• 수집 실패")
     L.append("")
@@ -190,10 +206,10 @@ def main():
     ai = fetch_news(query="의료 AI OR medical AI OR LLM OR GPT OR Claude AI", n=3)
     ax = fetch_arxiv()
     L.append("🤖 <b>AI 동향</b>")
-    for t in ai:
-        L.append(f"• {t[:65]}…" if len(t) > 65 else f"• {t}")
-    for t in ax[:2]:
-        L.append(f"• [arXiv] {t[:55]}…" if len(t) > 55 else f"• [arXiv] {t}")
+    for a in ai:
+        L.append(linked(a["title"], a["url"]))
+    for a in ax[:2]:
+        L.append(linked(a["title"], a["url"], prefix="[arXiv] "))
     if not ai and not ax:
         L.append("• 수집 실패")
     L.append("")
