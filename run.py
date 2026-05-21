@@ -197,21 +197,27 @@ def main():
     today = datetime.date.today().strftime("%Y년 %m월 %d일")
     L = [f"<b>📋 {today}</b>\n"]
 
-    print("날씨 수집 중...")
-    L.append(f"🌤 <b>날씨</b> {fetch_weather()}")
-
-    print("시장 수집 중...")
-    L.append(f"📈 <b>시장</b> {fetch_market()}")
-    L.append("")
-
     def linked(title, url, prefix=""):
         t = (title[:65] + "…") if len(title) > 65 else title
         if url:
             return f"• {prefix}<a href=\"{url}\">{t}</a>"
         return f"• {prefix}{t}"
 
-    print("한국 뉴스 수집 중...")
+    print("--- 날씨 ---")
+    w = fetch_weather()
+    print(w)
+    L.append(f"🌤 <b>날씨</b> {w}")
+
+    print("--- 시장 ---")
+    m = fetch_market()
+    print(m)
+    L.append(f"📈 <b>시장</b> {m}")
+    L.append("")
+
+    print("--- 한국 뉴스 ---")
     kr = fetch_news(country="kr", n=5)
+    print(f"수집 {len(kr)}건")
+    for a in kr: print(" -", a["title"][:60])
     L.append("📰 <b>한국 뉴스</b>")
     for a in kr:
         L.append(linked(a["title"], a["url"]))
@@ -219,9 +225,10 @@ def main():
         L.append("• 수집 실패")
     L.append("")
 
-    print("AI 뉴스 수집 중...")
+    print("--- AI 뉴스 ---")
     ai = fetch_news(query="의료 AI OR medical AI OR LLM OR GPT OR Claude AI", n=3)
     ax = fetch_arxiv()
+    print(f"AI뉴스 {len(ai)}건, arXiv {len(ax)}건")
     L.append("🤖 <b>AI 동향</b>")
     for a in ai:
         L.append(linked(a["title"], a["url"]))
@@ -231,15 +238,22 @@ def main():
         L.append("• 수집 실패")
     L.append("")
 
-    print("경쟁사 수집 중...")
+    print("--- 경쟁사 ---")
     comp = fetch_competitors()
+    print(f"수집 {len(comp)}건")
     L.append("🏢 <b>경쟁사</b>")
     L.extend(comp if comp else ["• 수집 실패"])
     L.append("")
 
-    print("FDA 수집 중...")
+    print("--- FDA ---")
+    fda = fetch_fda()
+    print(f"수집 {len(fda)}건")
     L.append("🏥 <b>FDA 510k</b>")
-    L.extend(fetch_fda())
+    L.extend(fda)
+
+    print("--- 메시지 길이 ---")
+    msg_preview = "\n".join(L)
+    print(f"{len(msg_preview)}자")
 
     message = "\n".join(L)
     if len(message) > 1020:
