@@ -25,7 +25,7 @@ jobs:
           ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
-          PAGES_URL: https://nevermind73-cell.github.io/daily-briefing/
+          PAGES_URL: https://htmlpreview.github.io/?https://raw.githubusercontent.com/nevermind73-cell/daily-briefing/main/index.html
         run: python run.py
 
       - name: Deploy to GitHub Pages
