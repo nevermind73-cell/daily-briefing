@@ -2,8 +2,11 @@ name: Daily Briefing
 
 on:
   schedule:
-    - cron: '0 23 * * *'  # 매일 오전 8시 KST (23:00 UTC)
-  workflow_dispatch:        # 수동 실행 버튼
+    - cron: '0 23 * * *'  # 매일 오전 8시 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   briefing:
@@ -22,4 +25,13 @@ jobs:
           ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+          PAGES_URL: https://nevermind73-cell.github.io/daily-briefing/
         run: python run.py
+
+      - name: Deploy to GitHub Pages
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Actions"
+          git add index.html
+          git diff --cached --quiet || git commit -m "briefing $(date +%Y-%m-%d)"
+          git push
