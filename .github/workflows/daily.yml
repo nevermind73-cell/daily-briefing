@@ -26,6 +26,9 @@ jobs:
           PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
           PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
           PAGES_URL: https://htmlpreview.github.io/?https://raw.githubusercontent.com/nevermind73-cell/daily-briefing/main/index.html
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          EMAIL_TO: ${{ secrets.EMAIL_TO }}
         run: python run.py
 
       - name: Deploy to GitHub Pages

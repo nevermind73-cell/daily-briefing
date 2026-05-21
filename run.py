@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Daily Briefing — GitHub Actions 버전"""
 import json, os, ssl, datetime, re, time, xml.etree.ElementTree as ET
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode, quote
 from urllib.error import HTTPError
@@ -12,6 +15,9 @@ CFG = {
     "pushover_user_key":  os.environ["PUSHOVER_USER_KEY"],
     "pushover_app_token": os.environ["PUSHOVER_APP_TOKEN"],
     "pages_url":          os.environ.get("PAGES_URL", ""),
+    "gmail_user":         os.environ.get("GMAIL_USER", ""),
+    "gmail_password":     os.environ.get("GMAIL_APP_PASSWORD", ""),
+    "email_to":           os.environ.get("EMAIL_TO", ""),
 }
 
 _SSL = ssl.create_default_context()
@@ -276,6 +282,29 @@ def send_pushover(summary, pages_url):
     with urlopen(req, context=_SSL, timeout=15) as r:
         return json.loads(r.read())
 
+# ── 이메일 발송 ───────────────────────────────────────────────────────────────
+
+def send_email(subject, html_body):
+    gmail_user = CFG["gmail_user"]
+    gmail_pw   = CFG["gmail_password"]
+    email_to   = CFG["email_to"]
+    if not (gmail_user and gmail_pw and email_to):
+        print("  이메일 설정 없음, 건너뜀")
+        return
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = gmail_user
+    msg["To"]      = email_to
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    with smtplib.SMTP("smtp.gmail.com", 587) as server:
+        server.ehlo()
+        server.starttls()
+        server.login(gmail_user, gmail_pw)
+        server.sendmail(gmail_user, email_to, msg.as_bytes())
+    print(f"  → {email_to} 발송 완료")
+
 # ── 메인 ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -337,6 +366,11 @@ def main():
     print(f"[8] Pushover 발송 ({len(summary)}자)...")
     result = send_pushover(summary, CFG["pages_url"])
     print(f" → {result}")
+
+    print("[9] 이메일 발송...")
+    today_str = datetime.date.today().strftime("%Y년 %m월 %d일")
+    send_email(f"📋 Daily Briefing {today_str}", html)
+
     print("=== 완료 ===")
 
 if __name__ == "__main__":
