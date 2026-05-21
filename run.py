@@ -203,9 +203,12 @@ def build_html(weather, market, kr_news, ai_news, arxiv, competitors, fda):
 
     # FDA
     if fda:
-        fda_html = "<ul>" + "".join(
-            f'<li>{lnk(i["url"], f"{i[\"k\"]} {i[\"name\"]}")} ({i["date"][:8] if i["date"] else ""})</li>'
-            for i in fda) + "</ul>"
+        fda_items = []
+        for i in fda:
+            label = i["k"] + " " + i["name"]
+            date = i["date"][:8] if i["date"] else ""
+            fda_items.append(f'<li>{lnk(i["url"], label)} ({date})</li>')
+        fda_html = "<ul>" + "".join(fda_items) + "</ul>"
     else:
         fda_html = "<p>최근 7일 신규 허가 없음</p>"
 
