@@ -5,7 +5,7 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from urllib.request import urlopen, Request
-from urllib.parse import urlencode, quote
+from urllib.parse import urlencode, quote, urlparse, parse_qs
 from urllib.error import HTTPError
 
 CFG = {
@@ -132,7 +132,9 @@ def fetch_competitors():
             news = []
             for item in items[:2]:
                 t = (item.findtext("title") or "").strip()
-                u = (item.findtext("link") or "").strip()
+                raw_u = (item.findtext("link") or "").strip()
+                qs = parse_qs(urlparse(raw_u).query)
+                u = qs.get("url", [raw_u])[0]
                 if t and u:
                     news.append({"title": t, "url": u})
             results[label] = news
