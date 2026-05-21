@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Daily Briefing — GitHub Actions 버전 (Python 표준 라이브러리만 사용)"""
-import json, os, ssl, datetime, re, xml.etree.ElementTree as ET
+import json, os, ssl, datetime, re, time, xml.etree.ElementTree as ET
 from urllib.request import urlopen, Request
 from urllib.parse import urlencode, quote
 from urllib.error import HTTPError
@@ -47,22 +47,32 @@ def fetch_market():
     key = CFG["alphavantage_key"]
     parts = []
     try:
+        # QQQ = 나스닥100 ETF (^IXIC는 Alpha Vantage 무료 플랜 미지원)
         q = getj(f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE"
-                 f"&symbol=^IXIC&apikey={key}").get("Global Quote", {})
-        parts.append(f"나스닥 {float(q.get('05. price',0)):,.0f} "
-                     f"({q.get('10. change percent','').strip()})")
+                 f"&symbol=QQQ&apikey={key}").get("Global Quote", {})
+        p = float(q.get("05. price", 0))
+        pct = q.get("10. change percent", "").strip()
+        if p:
+            parts.append(f"나스닥(QQQ) {p:,.2f} ({pct})")
     except: pass
+    time.sleep(1)
     try:
         q = getj(f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE"
                  f"&symbol=EWY&apikey={key}").get("Global Quote", {})
-        parts.append(f"코스피(EWY) {float(q.get('05. price',0)):.2f}")
+        p = float(q.get("05. price", 0))
+        pct = q.get("10. change percent", "").strip()
+        if p:
+            parts.append(f"코스피(EWY) {p:.2f} ({pct})")
     except: pass
+    time.sleep(1)
     try:
         r = getj(f"https://www.alphavantage.co/query"
                  f"?function=CURRENCY_EXCHANGE_RATE"
                  f"&from_currency=USD&to_currency=KRW&apikey={key}"
                  ).get("Realtime Currency Exchange Rate", {})
-        parts.append(f"USD/KRW {float(r.get('5. Exchange Rate',0)):,.0f}")
+        rate = float(r.get("5. Exchange Rate", 0))
+        if rate:
+            parts.append(f"USD/KRW {rate:,.0f}")
     except: pass
     return " | ".join(parts) if parts else "수집 실패"
 
@@ -71,15 +81,22 @@ def fetch_market():
 def fetch_news(query=None, country=None, n=5):
     try:
         key = CFG["newsapi_key"]
-        if country:
+        # top-headlines?country=kr 는 결과 0건 → everything 엔드포인트 사용
+        if country == "kr":
+            params = urlencode({"q": "한국 OR Korea", "language": "ko",
+                                "pageSize": n, "sortBy": "publishedAt",
+                                "apiKey": key})
+        elif country:
             params = urlencode({"country": country, "pageSize": n, "apiKey": key})
-            url = f"https://newsapi.org/v2/top-headlines?{params}"
         else:
             params = urlencode({"q": query, "pageSize": n,
                                 "sortBy": "publishedAt", "apiKey": key})
-            url = f"https://newsapi.org/v2/everything?{params}"
+        endpoint = ("top-headlines" if country and country != "kr"
+                    else "everything")
+        url = f"https://newsapi.org/v2/{endpoint}?{params}"
         return [{"title": a.get("title", ""), "url": a.get("url", "")}
-                for a in getj(url).get("articles", [])[:n]]
+                for a in getj(url).get("articles", [])[:n]
+                if a.get("title") and "[Removed]" not in a.get("title", "")]
     except:
         return []
 
