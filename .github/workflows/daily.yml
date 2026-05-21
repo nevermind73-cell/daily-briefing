@@ -1,0 +1,25 @@
+name: Daily Briefing
+
+on:
+  schedule:
+    - cron: '0 23 * * *'  # 매일 오전 8시 KST (23:00 UTC)
+  workflow_dispatch:        # 수동 실행 버튼
+
+jobs:
+  briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run Daily Briefing
+        env:
+          OPENWEATHERMAP_KEY: ${{ secrets.OPENWEATHERMAP_KEY }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          ALPHAVANTAGE_KEY: ${{ secrets.ALPHAVANTAGE_KEY }}
+          PUSHOVER_USER_KEY: ${{ secrets.PUSHOVER_USER_KEY }}
+          PUSHOVER_APP_TOKEN: ${{ secrets.PUSHOVER_APP_TOKEN }}
+        run: python run.py
