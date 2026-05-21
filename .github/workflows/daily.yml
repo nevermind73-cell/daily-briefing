@@ -34,4 +34,5 @@ jobs:
           git config user.name "GitHub Actions"
           git add index.html
           git diff --cached --quiet || git commit -m "briefing $(date +%Y-%m-%d)"
+          git pull --rebase origin main
           git push
